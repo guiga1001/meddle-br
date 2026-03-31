@@ -1,27 +1,36 @@
 import streamlit as st
 import pandas as pd
 from datetime import datetime
+import time
+import re
 
 # 1. Configuração da página
 st.set_page_config(page_title="Meddle BR", page_icon="🩺", layout="centered")
 
-# 2. Links das Planilhas
-URL_JOGOS = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSaYRZ8o_poW_YRuUke9vFxlmoezEp1S98ih7SCOeYgwzxlHMiJn9NcNrmXuLrkNC8ngnCb6Vth27PG/pub?output=csv"
-URL_LISTA_GERAL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSaYRZ8o_poW_YRuUke9vFxlmoezEp1S98ih7SCOeYgwzxlHMiJn9NcNrmXuLrkNC8ngnCb6Vth27PG/pub?gid=16863228&single=true&output=csv"
+# 2. Links das Planilhas (Originais)
+URL_JOGOS_BASE = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSaYRZ8o_poW_YRuUke9vFxlmoezEp1S98ih7SCOeYgwzxlHMiJn9NcNrmXuLrkNC8ngnCb6Vth27PG/pub?output=csv"
+URL_LISTA_BASE = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSaYRZ8o_poW_YRuUke9vFxlmoezEp1S98ih7SCOeYgwzxlHMiJn9NcNrmXuLrkNC8ngnCb6Vth27PG/pub?gid=16863228&single=true&output=csv"
 
-@st.cache_data(ttl=60)
-def load_data(url, nome_tabela):
+# Função para normalizar texto (Ignora espaços, parênteses e maiúsculas)
+def normalizar(texto):
+    return re.sub(r'[^a-zA-Z0-9]', '', str(texto)).lower()
+
+@st.cache_data(ttl=1) # TTL de 1 segundo para não travar nada no Streamlit
+def load_data(url_base, nome_tabela):
     try:
-        # Forçamos o separador como vírgula (',') para evitar que o Python 'invente' separadores
-        df = pd.read_csv(url, sep=',', encoding='utf-8-sig', on_bad_lines='skip')
+        # O PULO DO GATO: Adicionamos o timestamp atual no final da URL
+        # Isso 'engana' o cache do Google e força a versão mais nova.
+        cache_buster = f"&t={int(time.time())}"
+        url_final = url_base + cache_buster
         
-        # Se por acaso ele ler tudo em uma coluna só e não encontrar 'doenca', tenta ponto e vírgula
-        if len(df.columns) == 1 and 'doenca' not in str(df.columns[0]).lower():
-            df = pd.read_csv(url, sep=';', encoding='utf-8-sig', on_bad_lines='skip')
+        df = pd.read_csv(url_final, sep=',', encoding='utf-8-sig', on_bad_lines='skip')
+        
+        # Se falhou em separar colunas, tenta ponto e vírgula
+        if len(df.columns) == 1:
+            df = pd.read_csv(url_final, sep=';', encoding='utf-8-sig', on_bad_lines='skip')
 
-        # Limpeza das colunas
+        # Limpeza agressiva de nomes de colunas
         df.columns = [str(c).strip().lower().replace('ç','c').replace('ã','a') for c in df.columns]
-        
         return df
     except Exception as e:
         st.error(f"Erro ao carregar {nome_tabela}: {e}")
@@ -32,25 +41,25 @@ st.title("Meddle BR 🩺")
 st.write("Analise as dicas e escolha a hipótese diagnóstica.")
 
 try:
-    df_jogos = load_data(URL_JOGOS, "Calendário de Jogos")
-    df_opcoes = load_data(URL_LISTA_GERAL, "Lista de Doenças")
+    # Carregando com o novo sistema
+    df_jogos = load_data(URL_JOGOS_BASE, "Calendário de Jogos")
+    df_opcoes = load_data(URL_LISTA_BASE, "Lista de Doenças")
     
-    # Validação da Coluna 'doenca' na lista de opções
     if not df_opcoes.empty and 'doenca' in df_opcoes.columns:
         lista_doencas_completa = sorted(df_opcoes['doenca'].dropna().astype(str).unique().tolist())
     else:
-        # Se der erro, mostra ao desenvolvedor o que o código está vendo
-        st.error("Coluna 'doenca' não encontrada na planilha de lista.")
-        if not df_opcoes.empty: st.write(f"Colunas detectadas: {list(df_opcoes.columns)}")
         lista_doencas_completa = []
 
-    # Lógica do Jogo de Hoje
+    # Lógica da data
     hoje = datetime.now().strftime("%d/%m/%Y")
     df_jogos['data'] = df_jogos['data'].astype(str).str.strip()
     jogo_hoje = df_jogos[df_jogos['data'] == hoje]
 
     if jogo_hoje.empty:
-        st.warning(f"Sem caso clínico para hoje ({hoje}).")
+        st.warning(f"Nenhum caso clínico para hoje ({hoje}).")
+        if st.button("Tentar atualizar planilha agora"):
+            st.cache_data.clear()
+            st.rerun()
     else:
         dados = jogo_hoje.iloc[0]
         solucao = str(dados['doenca']).strip()
@@ -73,7 +82,8 @@ try:
             if st.button("Confirmar Hipótese"):
                 if palpite == "":
                     st.warning("Selecione uma doença!")
-                elif palpite.strip().lower() == solucao.lower():
+                # COMPARAÇÃO INTELIGENTE
+                elif normalizar(palpite) == normalizar(solucao):
                     st.session_state.terminou = True
                     st.session_state.venceu = True
                     st.rerun()
@@ -90,12 +100,17 @@ try:
                 st.balloons()
                 st.success(f"🔥 Acertou! O diagnóstico era **{solucao}**.")
             else:
-                st.error(f"Fim de jogo! O diagnóstico era: **{solucao}**.")
+                st.error(f"Fim de jogo! O diagnóstico correto era: **{solucao}**.")
+            
+            if st.button("Resetar jogo (Para testes)"):
+                st.session_state.tentativas = 0
+                st.session_state.terminou = False
+                st.rerun()
 
 except Exception as e:
-    st.error(f"Ocorreu um erro: {e}")
+    st.error(f"Erro: {e}")
 
-# Botão secreto para você limpar o cache se mudar algo na planilha
-if st.sidebar.button("🔄 Atualizar Dados (Limpar Cache)"):
+# Botão na lateral para garantir o refresh total
+if st.sidebar.button("🔄 Forçar Atualização da Planilha"):
     st.cache_data.clear()
     st.rerun()
