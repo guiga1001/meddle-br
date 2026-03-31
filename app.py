@@ -89,4 +89,28 @@ try:
                         st.rerun()
                     else:
                         st.session_state.tentativas += 1
-                        if st.session_state.tent
+                        if st.session_state.tentativas >= 6:
+                            st.session_state.terminou = True
+                            st.session_state.venceu = False
+                        st.rerun()
+
+        if st.session_state.terminou:
+            st.divider()
+            if st.session_state.venceu:
+                st.balloons()
+                st.success(f"🔥 Acertou! O diagnóstico era **{solucao}**.")
+            else:
+                st.error(f"Fim de jogo! O diagnóstico era: **{solucao}**.")
+            
+            if st.button("Recomeçar (Apenas para Testes)"):
+                st.session_state.tentativas = 0
+                st.session_state.terminou = False
+                st.session_state.chutes_feitos = []
+                st.rerun()
+
+except Exception as e:
+    st.error(f"Erro: {e}")
+
+if st.sidebar.button("🔄 Forçar Atualização"):
+    st.cache_data.clear()
+    st.rerun()
