@@ -9,13 +9,17 @@ st.set_page_config(page_title="Meddle BR", page_icon="🩺", layout="centered")
 URL_JOGOS = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSaYRZ8o_poW_YRuUke9vFxlmoezEp1S98ih7SCOeYgwzxlHMiJn9NcNrmXuLrkNC8ngnCb6Vth27PG/pub?output=csv"
 URL_LISTA_GERAL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSaYRZ8o_poW_YRuUke9vFxlmoezEp1S98ih7SCOeYgwzxlHMiJn9NcNrmXuLrkNC8ngnCb6Vth27PG/pub?gid=16863228&single=true&output=csv"
 
-@st.cache_data(ttl=60) # Atualiza mais rápido (a cada 1 minuto) para testes
+@st.cache_data(ttl=60)
 def load_data(url, nome_tabela):
     try:
-        # 'utf-8-sig' remove caracteres invisíveis que o Google Sheets às vezes coloca
-        df = pd.read_csv(url, sep=None, engine='python', encoding='utf-8-sig', on_bad_lines='skip')
+        # Forçamos o separador como vírgula (',') para evitar que o Python 'invente' separadores
+        df = pd.read_csv(url, sep=',', encoding='utf-8-sig', on_bad_lines='skip')
         
-        # LIMPEZA AGRESSIVA DE COLUNAS: tira espaços, põe minúsculo e remove acentos
+        # Se por acaso ele ler tudo em uma coluna só e não encontrar 'doenca', tenta ponto e vírgula
+        if len(df.columns) == 1 and 'doenca' not in str(df.columns[0]).lower():
+            df = pd.read_csv(url, sep=';', encoding='utf-8-sig', on_bad_lines='skip')
+
+        # Limpeza das colunas
         df.columns = [str(c).strip().lower().replace('ç','c').replace('ã','a') for c in df.columns]
         
         return df
