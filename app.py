@@ -1,4 +1,3 @@
-
 import streamlit as st
 import pandas as pd
 from datetime import datetime
@@ -6,57 +5,72 @@ from datetime import datetime
 # Configuração da página
 st.set_page_config(page_title="Meddle BR", page_icon="🩺", layout="centered")
 
-# Link da sua planilha (que você me enviou)
-SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSaYRZ8o_poW_YRuUke9vFxlmoezEp1S98ih7SCOeYgwzxlHMiJn9NcNrmXuLrkNC8ngnCb6Vth27PG/pub?output=csv"
+# LINKS DAS PLANILHAS
+# 1. Link da aba principal (Calendário de jogos)
+URL_JOGOS = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSaYRZ8o_poW_YRuUke9vFxlmoezEp1S98ih7SCOeYgwzxlHMiJn9NcNrmXuLrkNC8ngnCb6Vth27PG/pub?output=csv"
+
+# 2. Link da nova aba (Lista Geral de Doenças)
+URL_LISTA_GERAL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSaYRZ8o_poW_YRuUke9vFxlmoezEp1S98ih7SCOeYgwzxlHMiJn9NcNrmXuLrkNC8ngnCb6Vth27PG/pub?gid=16863228&single=true&output=csv"
 
 @st.cache_data(ttl=600)
-def load_data():
+def load_data(url):
     # O comando 'sep=None' faz o Python descobrir sozinho se é vírgula ou ponto e vírgula
-    df = pd.read_csv(SHEET_URL, sep=None, engine='python', encoding='utf-8')
-    # Limpa espaços extras nos nomes das colunas, caso existam
+    df = pd.read_csv(url, sep=None, engine='python', encoding='utf-8')
+    # Limpa espaços extras nos nomes das colunas
     df.columns = df.columns.str.strip()
     return df
 
 # Interface Visual
 st.title("Meddle BR 🩺")
-st.write("Tente adivinhar o diagnóstico com base nas dicas clínicas.")
+st.write("Analise as dicas e escolha a hipótese diagnóstica correta.")
 
 try:
-    df = load_data()
-    hoje = datetime.now().strftime("%d/%m/%Y")
+    # Carrega as duas tabelas
+    df_jogos = load_data(URL_JOGOS)
+    df_opcoes = load_data(URL_LISTA_GERAL)
     
-    # Filtra a linha do dia de hoje
-    jogo_hoje = df[df['data'] == hoje]
+    # Prepara a lista de sugestões (vem da aba 'lista_geral')
+    # Assume que a coluna na sua nova aba também se chama 'doenca'
+    lista_doencas_completa = sorted(df_opcoes['doenca'].unique().tolist())
+
+    # Lógica da data de hoje
+    hoje = datetime.now().strftime("%d/%m/%Y")
+    df_jogos['data'] = df_jogos['data'].astype(str).str.strip()
+    
+    # Filtra o jogo de hoje
+    jogo_hoje = df_jogos[df_jogos['data'] == hoje]
 
     if jogo_hoje.empty:
-        st.warning("Opa! Não encontrei o diagnóstico para o dia de hoje na planilha. Verifique a coluna 'data'.")
+        st.warning(f"Nenhum caso clínico agendado para hoje ({hoje}).")
+        st.info("Dica para o desenvolvedor: Verifique se a data na planilha está no formato DD/MM/AAAA e se o ano é 2026.")
     else:
         dados = jogo_hoje.iloc[0]
-        solucao = dados['doenca']
+        solucao = dados['doenca'].strip()
         dicas = [dados['dica1'], dados['dica2'], dados['dica3'], dados['dica4'], dados['dica5'], dados['dica6']]
-        
-        # Lista de sugestões para o usuário (todas as doenças da sua planilha)
-        lista_doencas = sorted(df['doenca'].unique().tolist())
 
         # Controle de estado (sessão)
         if 'tentativas' not in st.session_state:
             st.session_state.tentativas = 0
         if 'terminou' not in st.session_state:
             st.session_state.terminou = False
+        if 'venceu' not in st.session_state:
+            st.session_state.venceu = False
 
-        # Exibição das dicas
+        # Exibição das dicas liberadas
+        st.divider()
         for i in range(st.session_state.tentativas + 1):
             if i < 6:
                 st.info(f"**Dica {i+1}:** {dicas[i]}")
 
         # Interface de palpite
         if not st.session_state.terminou:
-            palpite = st.selectbox("Escolha seu diagnóstico:", [""] + lista_doencas, index=0)
+            # O selectbox agora usa a lista completa da nova aba
+            palpite = st.selectbox("Selecione seu diagnóstico:", [""] + lista_doencas_completa, index=0)
             
-            if st.button("Enviar Palpite"):
+            if st.button("Confirmar Hipótese"):
                 if palpite == "":
-                    st.warning("Selecione uma doença!")
-                elif palpite == solucao:
+                    st.warning("Selecione uma doença na lista!")
+                elif palpite.strip() == solucao:
                     st.session_state.terminou = True
                     st.session_state.venceu = True
                     st.rerun()
@@ -65,18 +79,21 @@ try:
                     if st.session_state.tentativas >= 6:
                         st.session_state.terminou = True
                         st.session_state.venceu = False
+                    else:
+                        st.error("Hipótese incorreta. Uma nova dica foi liberada!")
                     st.rerun()
 
         # Resultado Final
         if st.session_state.terminou:
+            st.divider()
             if st.session_state.venceu:
                 st.balloons()
-                st.success(f"🔥 Acertou! O diagnóstico era **{solucao}**.")
+                st.success(f"🔥 Sensacional! Você acertou: **{solucao}**")
+                st.write(f"Você utilizou {st.session_state.tentativas + 1} dicas.")
             else:
-                st.error(f"Fim de jogo! O diagnóstico correto era: **{solucao}**.")
+                st.error(f"Esgotaram as tentativas! O diagnóstico era: **{solucao}**")
             
-            if st.button("Jogar novamente amanhã"):
-                pass # O Streamlit reinicia automaticamente ao carregar
+            st.write("Volte amanhã para um novo desafio clínico!")
 
 except Exception as e:
-    st.error(f"Erro detalhado: {e}")
+    st.error(f"Erro ao carregar dados: {e}")
