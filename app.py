@@ -7,9 +7,14 @@ import re
 # 1. Configuração da página
 st.set_page_config(page_title="Meddle BR", page_icon="🩺", layout="centered")
 
-# 2. Links das Planilhas (Originais)
-URL_JOGOS_BASE = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSaYRZ8o_poW_YRuUke9vFxlmoezEp1S98ih7SCOeYgwzxlHMiJn9NcNrmXuLrkNC8ngnCb6Vth27PG/pub?output=csv"
-URL_LISTA_BASE = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSaYRZ8o_poW_YRuUke9vFxlmoezEp1S98ih7SCOeYgwzxlHMiJn9NcNrmXuLrkNC8ngnCb6Vth27PG/pub?gid=16863228&single=true&output=csv"
+
+ID_DA_PLANILHA = "1QIDAaiVyRltk6xkeBdMvLHf3xaODuBs9DWCpm1kjmZs"
+GID_LISTA = "16863228" 
+# Verifique se esse é o número no final do seu link
+
+URL_JOGOS_BASE = f"https://docs.google.com/spreadsheets/d/{ID_DA_PLANILHA}/export?format=csv"
+URL_LISTA_BASE = f"https://docs.google.com/spreadsheets/d/{ID_DA_PLANILHA}/export?format=csv&gid={GID_LISTA}"
+# ----------------------------------
 
 # Função para normalizar texto (Ignora espaços, parênteses e maiúsculas)
 def normalizar(texto):
