@@ -13,12 +13,19 @@ URL_JOGOS = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSaYRZ8o_poW_YRuUke
 URL_LISTA_GERAL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSaYRZ8o_poW_YRuUke9vFxlmoezEp1S98ih7SCOeYgwzxlHMiJn9NcNrmXuLrkNC8ngnCb6Vth27PG/pub?gid=16863228&single=true&output=csv"
 
 @st.cache_data(ttl=600)
-def load_data(url):
-    # O comando 'sep=None' faz o Python descobrir sozinho se é vírgula ou ponto e vírgula
-    df = pd.read_csv(url, sep=None, engine='python', encoding='utf-8')
-    # Limpa espaços extras nos nomes das colunas
-    df.columns = df.columns.str.strip()
-    return df
+def load_data(url, nome_tabela):
+    try:
+        # 'on_bad_lines' faz o código pular a linha se ela estiver com erro em vez de travar o site
+        df = pd.read_csv(url, sep=None, engine='python', encoding='utf-8', on_bad_lines='skip')
+        df.columns = df.columns.str.strip()
+        return df
+    except Exception as e:
+        st.error(f"Erro na tabela {nome_tabela}: {e}")
+        return pd.DataFrame() # Retorna tabela vazia se der erro crítico
+
+# Na parte do 'try' principal, mude as linhas de carregar para:
+df_jogos = load_data(URL_JOGOS, "Calendário de Jogos")
+df_opcoes = load_data(URL_LISTA_GERAL, "Lista de Doenças")
 
 # Interface Visual
 st.title("Meddle BR 🩺")
