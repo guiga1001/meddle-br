@@ -9,9 +9,12 @@ st.set_page_config(page_title="Meddle BR", page_icon="🩺", layout="centered")
 # Link da sua planilha (que você me enviou)
 SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSaYRZ8o_poW_YRuUke9vFxlmoezEp1S98ih7SCOeYgwzxlHMiJn9NcNrmXuLrkNC8ngnCb6Vth27PG/pub?output=csv"
 
-@st.cache_data(ttl=600) # Atualiza os dados a cada 10 minutos
+@st.cache_data(ttl=600)
 def load_data():
-    df = pd.read_csv(SHEET_URL)
+    # O comando 'sep=None' faz o Python descobrir sozinho se é vírgula ou ponto e vírgula
+    df = pd.read_csv(SHEET_URL, sep=None, engine='python', encoding='utf-8')
+    # Limpa espaços extras nos nomes das colunas, caso existam
+    df.columns = df.columns.str.strip()
     return df
 
 # Interface Visual
