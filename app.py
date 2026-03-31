@@ -6,56 +6,47 @@ from datetime import datetime
 st.set_page_config(page_title="Meddle BR", page_icon="🩺", layout="centered")
 
 # LINKS DAS PLANILHAS
-# 1. Link da aba principal (Calendário de jogos)
 URL_JOGOS = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSaYRZ8o_poW_YRuUke9vFxlmoezEp1S98ih7SCOeYgwzxlHMiJn9NcNrmXuLrkNC8ngnCb6Vth27PG/pub?output=csv"
-
-# 2. Link da nova aba (Lista Geral de Doenças)
 URL_LISTA_GERAL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSaYRZ8o_poW_YRuUke9vFxlmoezEp1S98ih7SCOeYgwzxlHMiJn9NcNrmXuLrkNC8ngnCb6Vth27PG/pub?gid=16863228&single=true&output=csv"
 
 @st.cache_data(ttl=600)
 def load_data(url, nome_tabela):
     try:
-        # 'on_bad_lines' faz o código pular a linha se ela estiver com erro em vez de travar o site
+        # 'on_bad_lines' pula linhas com erros de pontuação (como a linha 29)
         df = pd.read_csv(url, sep=None, engine='python', encoding='utf-8', on_bad_lines='skip')
         df.columns = df.columns.str.strip()
         return df
     except Exception as e:
-        st.error(f"Erro na tabela {nome_tabela}: {e}")
-        return pd.DataFrame() # Retorna tabela vazia se der erro crítico
-
-# Na parte do 'try' principal, mude as linhas de carregar para:
-df_jogos = load_data(URL_JOGOS, "Calendário de Jogos")
-df_opcoes = load_data(URL_LISTA_GERAL, "Lista de Doenças")
+        st.error(f"Erro ao carregar {nome_tabela}: {e}")
+        return pd.DataFrame()
 
 # Interface Visual
 st.title("Meddle BR 🩺")
 st.write("Analise as dicas e escolha a hipótese diagnóstica correta.")
 
 try:
-    # Carrega as duas tabelas
-    df_jogos = load_data(URL_JOGOS)
-    df_opcoes = load_data(URL_LISTA_GERAL)
+    # CARREGAMENTO DOS DADOS (Aqui estava o erro: agora passamos os 2 argumentos)
+    df_jogos = load_data(URL_JOGOS, "Calendário de Jogos")
+    df_opcoes = load_data(URL_LISTA_GERAL, "Lista de Doenças")
     
-    # Prepara a lista de sugestões (vem da aba 'lista_geral')
-    # Assume que a coluna na sua nova aba também se chama 'doenca'
-    lista_doencas_completa = sorted(df_opcoes['doenca'].unique().tolist())
+    if not df_opcoes.empty:
+        lista_doencas_completa = sorted(df_opcoes['doenca'].unique().tolist())
+    else:
+        lista_doencas_completa = []
 
-    # Lógica da data de hoje
+    # Lógica da data
     hoje = datetime.now().strftime("%d/%m/%Y")
     df_jogos['data'] = df_jogos['data'].astype(str).str.strip()
-    
-    # Filtra o jogo de hoje
     jogo_hoje = df_jogos[df_jogos['data'] == hoje]
 
     if jogo_hoje.empty:
-        st.warning(f"Nenhum caso clínico agendado para hoje ({hoje}).")
-        st.info("Dica para o desenvolvedor: Verifique se a data na planilha está no formato DD/MM/AAAA e se o ano é 2026.")
+        st.warning(f"Nenhum caso clínico para hoje ({hoje}).")
     else:
         dados = jogo_hoje.iloc[0]
-        solucao = dados['doenca'].strip()
+        solucao = str(dados['doenca']).strip()
         dicas = [dados['dica1'], dados['dica2'], dados['dica3'], dados['dica4'], dados['dica5'], dados['dica6']]
 
-        # Controle de estado (sessão)
+        # Controle de estado
         if 'tentativas' not in st.session_state:
             st.session_state.tentativas = 0
         if 'terminou' not in st.session_state:
@@ -63,21 +54,20 @@ try:
         if 'venceu' not in st.session_state:
             st.session_state.venceu = False
 
-        # Exibição das dicas liberadas
         st.divider()
+        # Mostra as dicas
         for i in range(st.session_state.tentativas + 1):
             if i < 6:
                 st.info(f"**Dica {i+1}:** {dicas[i]}")
 
-        # Interface de palpite
+        # Interface de jogo
         if not st.session_state.terminou:
-            # O selectbox agora usa a lista completa da nova aba
-            palpite = st.selectbox("Selecione seu diagnóstico:", [""] + lista_doencas_completa, index=0)
+            palpite = st.selectbox("Selecione seu diagnóstico:", [""] + lista_doencas_completa)
             
             if st.button("Confirmar Hipótese"):
                 if palpite == "":
-                    st.warning("Selecione uma doença na lista!")
-                elif palpite.strip() == solucao:
+                    st.warning("Selecione uma doença!")
+                elif palpite.strip().lower() == solucao.lower():
                     st.session_state.terminou = True
                     st.session_state.venceu = True
                     st.rerun()
@@ -87,20 +77,17 @@ try:
                         st.session_state.terminou = True
                         st.session_state.venceu = False
                     else:
-                        st.error("Hipótese incorreta. Uma nova dica foi liberada!")
+                        st.error("Incorreto! Nova dica liberada.")
                     st.rerun()
 
-        # Resultado Final
+        # Fim de jogo
         if st.session_state.terminou:
             st.divider()
             if st.session_state.venceu:
                 st.balloons()
-                st.success(f"🔥 Sensacional! Você acertou: **{solucao}**")
-                st.write(f"Você utilizou {st.session_state.tentativas + 1} dicas.")
+                st.success(f"🔥 Acertou! O diagnóstico era **{solucao}**.")
             else:
-                st.error(f"Esgotaram as tentativas! O diagnóstico era: **{solucao}**")
-            
-            st.write("Volte amanhã para um novo desafio clínico!")
+                st.error(f"Fim das tentativas. O diagnóstico era: **{solucao}**.")
 
 except Exception as e:
-    st.error(f"Erro ao carregar dados: {e}")
+    st.error(f"Erro crítico no sistema: {e}")
