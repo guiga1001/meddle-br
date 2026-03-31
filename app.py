@@ -8,7 +8,7 @@ import re
 st.set_page_config(page_title="Meddle BR", page_icon="🩺", layout="centered")
 
 # --- AJUSTE SEU ID AQUI ---
-ID_DA_PLANILHA = "1SaYRZ8o_poW_YRuUke9vFxlmoezEp1S98ih7SCOeYgwzxlHMiJn9NcNrmXuLrkNC8ngnCb6Vth27PG"
+ID_DA_PLANILHA = "1QIDAaiVyRltk6xkeBdMvLHf3xaODuBs9DWCpm1kjmZs"
 GID_LISTA = "16863228" 
 
 URL_JOGOS_BASE = f"https://docs.google.com/spreadsheets/d/{ID_DA_PLANILHA}/export?format=csv"
