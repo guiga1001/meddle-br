@@ -76,4 +76,4 @@ try:
                 pass # O Streamlit reinicia automaticamente ao carregar
 
 except Exception as e:
-    st.error("Erro ao carregar os dados. Verifique se o link da planilha está correto.")
+    st.error(f"Erro detalhado: {e}")
